@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#12263a">
+<title>Catatan Orderan</title>
+<style>
+:root{--bg:#eef2f5;--card:#fff;--tx:#12263a;--mut:#5d6f80;--line:#d5dde4;--k:#0e7c86;--kt:#fff;--bad:#b3402a;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1b27;--card:#172636;--tx:#e7eef5;--mut:#93a6b8;--line:#27394b;--k:#38b6c1;--kt:#0f1b27;--bad:#e8806a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f1b27;--card:#172636;--tx:#e7eef5;--mut:#93a6b8;--line:#27394b;--k:#38b6c1;--kt:#0f1b27;--bad:#e8806a;color-scheme:dark}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:520px;margin:0 auto;padding:18px 16px 40px}
+h1{font-size:24px;margin:0;font-weight:800;letter-spacing:-.02em}
+h2{font-size:15px;margin:0 0 10px;font-weight:700}
+.mut{color:var(--mut);font-size:14px}
+.num{font-variant-numeric:tabular-nums}
+#go{display:block;width:100%;margin:16px 0;border:0;border-radius:20px;background:var(--k);color:var(--kt);font:inherit;padding:26px 12px;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+#go:active{transform:scale(.98)}
+#go:disabled{opacity:.6}
+#go .big{display:block;font-size:30px;font-weight:800}
+#go .sub{display:block;font-size:15px;margin-top:4px;opacity:.9}
+#warn{display:none;background:var(--card);border:1px solid var(--bad);color:var(--bad);border-radius:12px;padding:10px 12px;font-size:14px;margin-bottom:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:16px}
+ul{list-style:none;margin:0;padding:0}
+li.o{display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+li.o:first-child{border-top:0;padding-top:0}
+li.o .tm{font-size:22px;font-weight:800;min-width:64px}
+li.o .lc{flex:1;min-width:0;font-size:14px;color:var(--mut);overflow-wrap:anywhere}
+li.o a{color:var(--k);font-weight:600}
+li.o button{border:0;background:none;color:var(--mut);font-size:18px;padding:10px;cursor:pointer}
+.hr{display:grid;grid-template-columns:48px 1fr auto;gap:10px;align-items:center;padding:5px 0;font-size:14px}
+.hr .bw{height:12px;background:var(--line);border-radius:6px;overflow:hidden}
+.hr .bw i{display:block;height:100%;background:var(--k);border-radius:6px}
+.hr .tx{color:var(--mut);white-space:nowrap}
+.day{display:flex;justify-content:space-between;padding:7px 0;border-top:1px solid var(--line);font-size:15px}
+.day:first-of-type{border-top:0}
+button:focus-visible{outline:3px solid var(--k);outline-offset:2px}
+.empty{color:var(--mut);font-size:14px}
+</style>
+</head>
+<body>
+<main>
+<h1>Catatan Orderan</h1>
+<div class="mut num" id="hdr"></div>
+<button id="go" type="button"><span class="big">&#10003; Ada orderan</span><span class="sub num" id="cnt"></span></button>
+<div id="warn"></div>
+
+<section class="card">
+<h2>Orderan hari ini</h2>
+<ul id="today"></ul>
+</section>
+
+<section class="card">
+<h2>Rekap per jam</h2>
+<div class="mut" id="hnote" style="margin-bottom:6px"></div>
+<div id="hours"></div>
+</section>
+
+<section class="card">
+<h2>Riwayat harian</h2>
+<div id="days"></div>
+</section>
+<p class="mut">Jam dan titik lokasi dicatat otomatis saat Anda mengetuk tombol. Data tersimpan di HP ini.</p>
+</main>
+<script>
+(function(){
+var K='catatan-order-v1',S;
+function load(){try{var x=JSON.parse(localStorage.getItem(K));if(x&&x.orders)return x}catch(e){}return{orders:[]}}
+function save(){try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}}
+S=load();
+S.orders.forEach(function(o){if(o.st==='wait')o.st='err'});
+var DN=['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
+function p2(n){return String(n).padStart(2,'0')}
+function dkey(t){var d=new Date(t);return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())}
+function hm(t){var d=new Date(t);return p2(d.getHours())+':'+p2(d.getMinutes())}
+function dec(n){return (Math.round(n*10)/10).toString().replace('.',',')}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+var go=document.getElementById('go'),warn=document.getElementById('warn');
+function say(t){warn.textContent=t;warn.style.display=t?'block':'none'}
+function add(){
+ var o={id:Date.now(),ts:Date.now(),st:'wait'};
+ S.orders.push(o);save();render();
+ try{navigator.vibrate&&navigator.vibrate(40)}catch(e){}
+ go.disabled=true;setTimeout(function(){go.disabled=false},2000);
+ if(!navigator.geolocation){o.st='err';o.why='Lokasi tidak didukung';save();render();return}
+ navigator.geolocation.getCurrentPosition(function(p){
+  o.lat=p.coords.latitude;o.lng=p.coords.longitude;o.acc=Math.round(p.coords.accuracy);o.st='ok';say('');save();render();
+ },function(e){
+  o.st='err';o.why=e.code===1?'Lokasi diblokir':'Lokasi belum didapat';
+  say(e.code===1?'Lokasi diblokir oleh halaman ini. Jam orderan tetap tercatat.':'Lokasi belum didapat. Pastikan GPS menyala. Jam orderan tetap tercatat.');
+  save();render();
+ },{enableHighAccuracy:true,timeout:10000,maximumAge:20000});
+}
+go.addEventListener('click',add);
+document.getElementById('today').addEventListener('click',function(e){
+ if(!e.target.matches('[data-del]'))return;
+ var id=+e.target.dataset.del;
+ if(confirm('Hapus catatan ini?')){S.orders=S.orders.filter(function(o){return o.id!==id});save();render()}
+});
+function locText(o){
+ if(o.st==='wait')return'Mencari lokasi...';
+ if(o.st==='ok')return '<a href="https://www.google.com/maps?q='+o.lat+','+o.lng+'" target="_blank" rel="noopener">Lihat di peta</a><br><span class="num">'+o.lat.toFixed(5)+', '+o.lng.toFixed(5)+' (&plusmn;'+o.acc+' m)</span>';
+ return esc(o.why||'Lokasi tidak tercatat');
+}
+function render(){
+ var now=Date.now(),tk=dkey(now),d=new Date(now);
+ var all=S.orders.slice().sort(function(a,b){return a.ts-b.ts});
+ var today=all.filter(function(o){return dkey(o.ts)===tk});
+ document.getElementById('hdr').textContent=DN[d.getDay()]+', '+d.getDate()+'/'+(d.getMonth()+1)+'/'+d.getFullYear();
+ document.getElementById('cnt').textContent=today.length+' orderan hari ini';
+ var tl=today.slice().reverse().map(function(o){
+  return '<li class="o"><span class="tm num">'+hm(o.ts)+'</span><span class="lc">'+locText(o)+'</span><button type="button" data-del="'+o.id+'" aria-label="Hapus catatan jam '+hm(o.ts)+'">&#10005;</button></li>';
+ }).join('');
+ document.getElementById('today').innerHTML=tl||'<li class="empty">Belum ada. Ketuk tombol hijau saat dapat orderan.</li>';
+
+ var byDay={},hc={};
+ all.forEach(function(o){var k=dkey(o.ts),h=new Date(o.ts).getHours();byDay[k]=(byDay[k]||0)+1;hc[h]=hc[h]||{t:0,a:0};hc[h].a++;if(k===tk)hc[h].t++});
+ var nd=Object.keys(byDay).length,hs=Object.keys(hc).map(Number);
+ var hEl=document.getElementById('hours');
+ if(!hs.length){hEl.innerHTML='<div class="empty">Rekap muncul setelah ada orderan tercatat.</div>';document.getElementById('hnote').textContent=''}
+ else{
+  var lo=Math.min.apply(null,hs),hi=Math.max.apply(null,hs),mx=0,rows='',best=-1,bv=0,h;
+  for(h=lo;h<=hi;h++){var v=hc[h]?hc[h].a/nd:0;if(v>mx)mx=v;if(v>bv){bv=v;best=h}}
+  for(h=lo;h<=hi;h++){
+   var c=hc[h]||{t:0,a:0},av=c.a/nd;
+   rows+='<div class="hr num"><span>'+p2(h)+':00</span><span class="bw"><i style="width:'+(mx?av/mx*100:0)+'%"></i></span><span class="tx">'+c.t+' hari ini &middot; rata-rata '+dec(av)+'</span></div>';
+  }
+  hEl.innerHTML=rows;
+  document.getElementById('hnote').textContent='Rata-rata dihitung dari '+nd+' hari. Jam paling ramai: '+p2(best)+':00 ('+dec(bv)+' orderan per jam).';
+ }
+ var keys=Object.keys(byDay).sort().reverse().slice(0,14);
+ document.getElementById('days').innerHTML=keys.map(function(k){
+  var q=k.split('-'),dt=new Date(+q[0],+q[1]-1,+q[2]);
+  return '<div class="day num"><span>'+DN[dt.getDay()]+', '+(+q[2])+'/'+(+q[1])+'</span><strong>'+byDay[k]+' orderan</strong></div>';
+ }).join('')||'<div class="empty">Belum ada riwayat.</div>';
+}
+render();setInterval(render,60000);
+})();
+</script>
+</body>
+</html>
